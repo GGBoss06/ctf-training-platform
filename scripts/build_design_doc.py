@@ -733,8 +733,14 @@ p('AI 生成的脚本与文档均经过本地实际执行验证：数据库脚�
 # 八 版本控制记录
 # ============================================================
 h('八  版本控制记录')
+try:
+    remote = subprocess.run(['git', 'remote', 'get-url', 'origin'], cwd=ROOT,
+                            capture_output=True, text=True).stdout.strip().removesuffix('.git')
+except Exception:
+    remote = ''
 p('本项目的代码与文档使用 Git 进行版本管理，仓库采用 docs、database、scripts、src、tests 的标准目录结构。'
-  '提交信息统一采用“类型(范围): 简述”的规范前缀，类型取 feat、fix、docs、style、refactor、test、build、chore。')
+  + (f'远程仓库地址为 {remote} ，主分支为 main。' if remote else ''))
+p('提交信息统一采用“类型(范围): 简述”的规范前缀，类型取 feat、fix、docs、style、refactor、test、build、chore。')
 try:
     log = subprocess.run(['git', 'log', '--pretty=format:%h|%ad|%s', '--date=format:%Y-%m-%d %H:%M'],
                          cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip().splitlines()

@@ -12,6 +12,14 @@
 
 数据库层是本项目的实现重点：7 张基本表、5 个视图、5 个存储过程、3 个触发器，全部脚本可在 MySQL 8.0+ 上一次性初始化并自动验证。
 
+## 仓库地址
+
+<https://github.com/GGBoss06/ctf-training-platform>
+
+```bash
+git clone https://github.com/GGBoss06/ctf-training-platform.git
+```
+
 ## 目录结构
 
 ```
