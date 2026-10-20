@@ -18,15 +18,20 @@
 ctf-training-platform/
 ├── README.md                 项目说明（本文件）
 ├── .gitignore                忽略规则
-├── docs/                     文档与验证证据
-│   ├── db_verification.json  数据库自动化验证结果（29 项）
-│   └── ……                    大作业报告、设计文档、界面截图
-├── database/                 数据库脚本
-│   ├── README.md             脚本说明
-│   └── ctf_init.sql          建库建表 + 视图 + 存储过程 + 触发器 + 演示数据
-├── scripts/                  工具脚本
-│   ├── verify_db.py          数据库自动化验证
-│   └── build_report.py       报告生成脚本
+├── docs/                                 文档与验证证据
+│   ├── 系统设计文档_初稿.docx            大作业报告初稿（课程模板一至八章）
+│   ├── CTF训练竞赛平台数据库实现说明.docx 数据库实现说明
+│   ├── db_verification.json              数据库自动化验证结果（29 项）
+│   └── figures/                          插图和版本控制记录截图
+├── database/                             数据库脚本
+│   ├── README.md                         脚本说明
+│   └── ctf_init.sql                      建库建表 + 视图 + 存储过程 + 触发器 + 演示数据
+├── scripts/                              工具脚本
+│   ├── verify_db.py                      数据库自动化验证
+│   ├── build_report.py                   数据库实现说明生成
+│   ├── build_design_doc.py               系统设计文档生成
+│   ├── build_figures.py                  功能模块图与 E-R 图生成
+│   └── render_screenshot.py              版本控制记录截图生成
 ├── src/                      源代码
 │   └── web/                  应用层（ASP.NET Web Forms，规划中）
 └── tests/                    测试说明与用例
