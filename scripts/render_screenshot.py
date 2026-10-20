@@ -91,10 +91,6 @@ def build_items():
     items.append(('cmd', '$ git log --oneline --graph --decorate'))
     for line in git_log_lines():
         items.append(('log', line))
-    items.append(('out', ''))
-    items.append(('cmd', '$ git status -sb'))
-    items.append(('ok', '## main'))
-    items.append(('ok', 'nothing to commit, working tree clean'))
     return items
 
 

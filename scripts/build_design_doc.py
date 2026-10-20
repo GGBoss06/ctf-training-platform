@@ -741,14 +741,15 @@ try:
 except Exception:
     log = []
 rows = []
-for i, line in enumerate(log, 1):
+for i, line in enumerate(reversed(log), 1):
     parts = line.split('|')
     if len(parts) == 3:
         rows.append([i, parts[0], parts[1], parts[2]])
 if rows:
     table(['序号', '提交', '时间', '提交信息'], rows, [1.2, 1.9, 3.6, 10.3],
           center_cols=[0, 1, 2], caption_text='表 14  版本控制记录')
-p('提交前缀与实际内容一一对应：chore 用于仓库与目录初始化，feat 用于新增数据库脚本，'
+p('表 14 记录截至本文档更新时的提交历史，按时间顺序排列。提交前缀与实际内容一一对应：chore 用于仓库与目录初始化，'
+  'feat 用于新增数据库脚本，'
   'test 用于验证脚本与验证结果，build 用于构建与生成脚本，docs 用于文档提交。'
   '每次提交均可通过 git log 与 git show 查看具体改动，仓库结构截图见附图。')
 shot = DOCS / 'figures' / 'version-control.png'
