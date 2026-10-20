@@ -82,7 +82,11 @@ def git_log_lines():
 
 def build_items():
     items = []
-    items.append(('cmd', '$ cd ~/Documents/Codex/2026-10-13/ctf-training-platform'))
+    try:
+        where = '~/' + str(ROOT.relative_to(Path.home()))
+    except ValueError:
+        where = str(ROOT)
+    items.append(('cmd', f'$ cd {where}'))
     items.append(('out', ''))
     items.append(('cmd', '$ tree -L 2 --dirsfirst'))
     for line in tree_lines(ROOT):
