@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 本地数据库实例与套接字
+mysql-data/
+*.sock
+
+# 日志与临时文件
+*.log
+*.tmp
+~$*
+
+# IDE / 编辑器
+.idea/
+.vscode/
+*.suo
+*.user
+
+# Office 临时文件
+~$*.doc
+~$*.docx
