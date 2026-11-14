@@ -36,24 +36,26 @@ def cli_base():
     if SOCK:
         return [MYSQL_BIN, '--no-defaults', '-S', SOCK, '-u', USER]
     args = [MYSQL_BIN, '--no-defaults', '-h', HOST, '-P', str(PORT), '-u', USER]
-    if PASSWORD:
-        args.append('-p' + PASSWORD)
     return args
 
 
 def reload_schema():
     """重建 ctf 库并重新导入初始化脚本。"""
+    # 通过环境传递客户端口令，避免出现在进程命令行中。
+    cli_env = dict(os.environ)
+    if PASSWORD:
+        cli_env['MYSQL_PWD'] = PASSWORD
     subprocess.run(cli_base() + ['-e', 'DROP DATABASE IF EXISTS ctf;'], check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                   stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=cli_env)
     with SQL_FILE.open('rb') as fh:
-        r = subprocess.run(cli_base(), stdin=fh, capture_output=True)
+        r = subprocess.run(cli_base(), stdin=fh, capture_output=True, env=cli_env)
     if r.returncode != 0:
         sys.exit('导入 ctf_init.sql 失败：\n' + r.stderr.decode())
 
 
 def connect():
     if SOCK:
-        return pymysql.connect(unix_socket=SOCK, user=USER, database='ctf',
+        return pymysql.connect(unix_socket=SOCK, user=USER, password=PASSWORD, database='ctf',
                                charset='utf8mb4', autocommit=False)
     return pymysql.connect(host=HOST, port=PORT, user=USER, password=PASSWORD, database='ctf',
                            charset='utf8mb4', autocommit=False)

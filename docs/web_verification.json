@@ -1,0 +1,7 @@
+{
+  "mysql_version": "8.4.7",
+  "tests": 6,
+  "passed": true,
+  "failures": [],
+  "errors": []
+}
