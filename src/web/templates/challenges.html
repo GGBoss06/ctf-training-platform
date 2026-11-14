@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% block content %}
+<div class="eyebrow">PRACTICE · LEARN · PROGRESS</div><h1>从一道题开始进步</h1><p class="lead">按方向和难度选择训练。首次解出获得积分，每次提交都留下可追溯的记录。</p>
+<form class="panel toolbar" method="get"><label>关键词<input type="search" name="q" placeholder="搜索题目名称" value="{{ request.args.get('q','') }}" maxlength="64"></label>
+<label>训练方向<select name="category"><option value="">全部方向</option>{% for c in categories %}<option {% if request.args.get('category') == c.Cname %}selected{% endif %}>{{ c.Cname }}</option>{% endfor %}</select></label>
+<label>难度<select name="difficulty"><option value="">全部难度</option>{% for n in range(1,6) %}<option value="{{ n }}" {% if request.args.get('difficulty') == n|string %}selected{% endif %}>{{ n }} 级</option>{% endfor %}</select></label><button>检索题目</button><a href="/challenges">重置</a></form>
+<p class="muted">共找到 {{ rows|length }} 道已上架题目</p><div class="cards">{% for r in rows %}<article class="card"><div><span class="badge">{{ r.分类 }}</span><span class="badge">难度 {{ r.难度 }}</span></div><h2><a href="/challenges/{{ r.题目编号 }}">{{ r.题名 }}</a></h2><p class="muted">{{ (r.题目描述 or '')[:50] }}</p><p class="score">{{ r.分值 }} <small>分</small></p></article>{% else %}<p class="empty">没有找到符合条件的题目。</p>{% endfor %}</div>{% endblock %}

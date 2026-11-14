@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% block title %}{{ item.题名 }}{% endblock %}{% block content %}
+<a href="/challenges">← 返回题库</a><section class="panel"><span class="badge">{{ item.分类 }}</span><span class="badge">难度 {{ item.难度 }}</span><h1>{{ item.题名 }}</h1><p class="metric">{{ item.分值 }} <small>分</small></p><pre>{{ item.题目描述 }}</pre>
+{% if item.附件 %}<p class="muted">附件标识：{{ item.附件 }}。当前演示包未提供原始题目附件；可使用部署说明中的演示 flag 验证平台流程。</p>{% endif %}
+<hr>{% if g.user %}<h2>{{ '已解出 · 可继续提交验证' if solved else '提交你的 flag' }}</h2><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Flag<input name="flag" minlength="6" maxlength="128" placeholder="flag{...}" required autocomplete="off"></label><button>提交判定</button></form>{% else %}<p>登录后可提交 flag 并获得积分。</p><a class="button" href="/login">前往登录</a>{% endif %}</section>{% endblock %}
