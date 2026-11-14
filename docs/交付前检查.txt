@@ -1,0 +1,32 @@
+交付材料与最后两步
+
+学生信息沿用原始文档：241240075 闫博泉，24034202 班。
+报告共 24 页，电子签栏需要本人填写。
+
+一、本人电子签
+1. 打开 01_系统设计报告 中的 Word 文件，在封面插入本人电子签名。
+2. 用签署后的 Word 重新导出同名 PDF，替换原 PDF。
+3. 将签署后的 Word、PDF 同时复制到 02_程序源代码/ctf-training-platform/docs，覆盖对应最终报告。
+
+二、通过本机 GitHub Desktop 推送
+1. 先解压整个压缩包。
+2. GitHub Desktop → File → Add Local Repository。
+3. 选择 02_程序源代码/ctf-training-platform 文件夹。
+4. 确认远程为 GGBoss06/ctf-training-platform、当前分支为 main。
+5. 如果修改了签名，使用 docs(report): 补充本人电子签与最终报告 作为提交说明，并点击 Commit to main。
+6. 点击 Push origin。交付包中准备的新增提交会一起推送。
+7. 打开 GitHub 网页核对提交总数至少 20，并确认有最终代码、Word 和 PDF。
+8. 若提示远程已有新提交，不要 Force push；保留两份项目后合并处理。
+
+当前环境没有登录你的 GitHub，所以没有代为完成远程推送。
+外层 04_版本控制记录.txt 记录打包时本地历史；签名后还可导出最新记录替换。
+
+三、压缩上传
+完成签名和推送后，将 241240075闫博泉 整个文件夹重新压缩为同名 zip，上传学习通。
+程序源代码保留 .git 历史供 GitHub Desktop 识别；不要误删。
+
+四、运行和验证
+程序运行步骤见源码 README.md。
+数据库文件包括初始化 ctf_init.sql 和实际导出且验证回灌的 ctf_backup.sql。
+29 项数据库验证和 6 组 Web 集成测试已通过；截图为真实运行页面。
+原始漏洞题附件不在当前包内，演示账号与 flag 可在 README 找到。
