@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block title %}个人中心{% endblock %}{% block content %}
+<div class="eyebrow">MY TRAINING</div><h1>{{ g.user.Username }} 的个人中心</h1>
+<div class="two-col"><section class="panel"><h2>资料设置</h2><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label>电子邮箱<input type="email" name="email" value="{{ g.user.Email }}" maxlength="64" required></label>
+<details><summary>修改密码</summary><label>当前密码<input type="password" name="current_password" maxlength="64" autocomplete="current-password"></label>
+<label>新密码<input type="password" name="new_password" minlength="6" maxlength="64" autocomplete="new-password"></label></details><div class="actions"><button>保存资料</button></div></form></section>
+<section class="panel"><h2>训练成绩</h2><div class="metric">{{ total }} <small>分</small></div><p>已解出 {{ scores|length }} 道题目</p><a href="/ranking">查看排行榜 →</a></section></div>
+<section class="panel"><h2>最近 100 次提交</h2><div class="table-wrap"><table><thead><tr><th>题目</th><th>分类</th><th>判定</th><th>本次得分</th><th>时间</th></tr></thead><tbody>{% for r in records %}<tr><td>{{ r.题名 }}</td><td>{{ r.分类 }}</td><td>{{ '正确' if r.是否答对 else '错误' }}</td><td>{{ r.本次得分 }}</td><td>{{ r.提交时间 }}</td></tr>{% else %}<tr><td colspan="5">暂无提交</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}

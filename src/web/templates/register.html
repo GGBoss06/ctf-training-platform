@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block title %}注册{% endblock %}{% block content %}
+<section class="panel auth"><div class="eyebrow">START TRAINING</div><h1>创建训练账号</h1>
+<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label>用户名<input name="username" pattern="[A-Za-z0-9_]{3,32}" minlength="3" maxlength="32" autocomplete="username" required><small>3 至 32 位字母、数字或下划线。</small></label>
+<label>电子邮箱<input type="email" name="email" autocomplete="email" maxlength="64" required></label>
+<label>密码<input type="password" name="password" minlength="6" maxlength="64" autocomplete="new-password" required></label>
+<label><input type="checkbox" required> 我将仅在授权的训练环境中进行练习</label>
+<button>注册</button></form></section>{% endblock %}
