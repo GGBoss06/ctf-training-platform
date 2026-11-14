@@ -189,7 +189,145 @@ def create_app(test_config=None):
         return render_template('ranking.html', rows=rows,
                                categories=query('SELECT * FROM Categories ORDER BY Cid'))
 
-    # 管理员路由。
+    def challenge_values():
+        try:
+            cid = int(request.form.get('cid', 0))
+            difficulty = int(request.form.get('difficulty', 0))
+            score = int(request.form.get('score', 0))
+        except ValueError:
+            abort(400, '分类、难度和分值应为整数')
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        flag = request.form.get('flag', '').strip()
+        attachment = request.form.get('attachment', '').strip()
+        if not 1 <= difficulty <= 5 or not 1 <= score <= 100000 or not 1 <= len(title) <= 64 or len(description) > 500 or len(attachment) > 128 or (flag and not 6 <= len(flag) <= 128):
+            abort(400, '请检查题名、难度、分值、题面及 flag 长度')
+        if not query('SELECT 1 FROM Categories WHERE Cid=%s', (cid,), one=True):
+            abort(400, '分类不存在')
+        return cid, title, description, difficulty, score, flag, attachment
+
+    @app.get('/admin/challenges')
+    @require_user(admin=True)
+    def admin_challenges():
+        rows = query('SELECT ch.Chid,ch.Title,ch.Difficulty,ch.Score,ch.Status,ca.Cname '
+                     'FROM Challenges ch JOIN Categories ca ON ca.Cid=ch.Cid ORDER BY ch.Chid DESC')
+        return render_template('admin_challenges.html', rows=rows)
+
+    @app.route('/admin/challenges/new', methods=['GET', 'POST'])
+    @require_user(admin=True)
+    def add_challenge():
+        if request.method == 'POST':
+            values = challenge_values()
+            if not values[5]:
+                abort(400, '新建题目必须填写 flag')
+            result = call('sp_add_challenge', (g.user['Uid'],) + values, ('chid', 'result', 'message'))
+            flash(result['message'], 'success' if result['result'] == 'ok' else 'error')
+            return redirect(url_for('admin_challenges'))
+        return render_template('challenge_form.html', item=None,
+                               categories=query('SELECT * FROM Categories ORDER BY Cid'))
+
+    @app.route('/admin/challenges/<int:chid>/edit', methods=['GET', 'POST'])
+    @require_user(admin=True)
+    def edit_challenge(chid):
+        item = query('SELECT Chid,Cid,Title,Description,Difficulty,Score,Attachment,Status FROM Challenges WHERE Chid=%s', (chid,), one=True)
+        if not item:
+            abort(404, '题目不存在')
+        if request.method == 'POST':
+            cid, title, description, difficulty, score, flag, attachment = challenge_values()
+            db = connection()
+            db.begin()
+            try:
+                query('SELECT Chid FROM Challenges WHERE Chid=%s FOR UPDATE', (chid,), one=True)
+                submitted = query('SELECT 1 FROM Submissions WHERE Chid=%s LIMIT 1', (chid,), one=True)
+                if submitted and (flag or cid != item['Cid'] or title != item['Title'] or score != item['Score']):
+                    db.rollback()
+                    flash('已有提交的题目不能修改 flag、题名、分类或分值。', 'error')
+                    return redirect(url_for('edit_challenge', chid=chid))
+                execute('UPDATE Challenges SET Cid=%s,Title=%s,Description=%s,Difficulty=%s,Score=%s,Attachment=%s WHERE Chid=%s',
+                        (cid, title, description, difficulty, score, attachment, chid))
+                if flag:
+                    salt = secrets.token_hex(16)
+                    digest = hashlib.sha256((flag + salt).encode()).hexdigest()
+                    execute('UPDATE Challenges SET FlagHash=%s,FlagSalt=%s WHERE Chid=%s', (digest, salt, chid))
+                execute('INSERT INTO OperationLogs(Uid,Action,Target,Detail) VALUES(%s,%s,%s,%s)',
+                        (g.user['Uid'], '修改题目', title, '更新题目内容'))
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            flash('题目信息已更新。', 'success')
+            return redirect(url_for('admin_challenges'))
+        return render_template('challenge_form.html', item=item,
+                               categories=query('SELECT * FROM Categories ORDER BY Cid'))
+
+    @app.post('/admin/challenges/<int:chid>/<action>')
+    @require_user(admin=True)
+    def challenge_action(chid, action):
+        if action == 'publish':
+            result = call('sp_publish_challenge', (chid, g.user['Uid']), ('result', 'message'))
+            flash(result['message'], 'success' if result['result'] in {'ok', 'noop'} else 'error')
+            return redirect(url_for('admin_challenges'))
+        if action not in {'offline', 'delete'}:
+            abort(404)
+        db = connection()
+        db.begin()
+        try:
+            item = query('SELECT Chid,Title,Status FROM Challenges WHERE Chid=%s FOR UPDATE', (chid,), one=True)
+            if not item:
+                abort(404, '题目不存在')
+            if action == 'delete':
+                if item['Status'] != 'draft' or query('SELECT 1 FROM Submissions WHERE Chid=%s LIMIT 1', (chid,), one=True):
+                    db.rollback()
+                    flash('仅能删除没有提交记录的草稿；已上架题目请下线。', 'error')
+                    return redirect(url_for('admin_challenges'))
+                execute('DELETE FROM Challenges WHERE Chid=%s', (chid,))
+                execute('INSERT INTO OperationLogs(Uid,Action,Target,Detail) VALUES(%s,%s,%s,%s)', (g.user['Uid'], '删除草稿', item['Title'], '删除未产生提交的草稿'))
+            else:
+                execute('SET @operator_uid=%s', (g.user['Uid'],))
+                execute("UPDATE Challenges SET Status='offline' WHERE Chid=%s", (chid,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        flash('草稿已删除。' if action == 'delete' else '题目已下线。', 'success')
+        return redirect(url_for('admin_challenges'))
+
+    @app.route('/admin/users', methods=['GET', 'POST'])
+    @require_user(admin=True)
+    def admin_users():
+        if request.method == 'POST':
+            try:
+                uid = int(request.form.get('uid', 0))
+            except ValueError:
+                abort(400, '用户编号无效')
+            status = request.form.get('status')
+            if status not in {'active', 'disabled'}:
+                abort(400, '账号状态无效')
+            changed = execute("UPDATE Users SET Status=%s WHERE Uid=%s AND Role='student'", (status, uid))
+            flash('学生账号状态已更新。' if changed else '未更新，管理员账号受保护。', 'success' if changed else 'error')
+            return redirect(url_for('admin_users'))
+        keyword = request.args.get('q', '').strip()[:32]
+        users = query('SELECT Uid,Username,Email,Role,Status FROM Users WHERE Username LIKE %s ORDER BY Uid', ('%' + keyword + '%',))
+        return render_template('users.html', users=users)
+
+    @app.get('/admin/logs')
+    @require_user(admin=True)
+    def admin_logs():
+        keyword = request.args.get('q', '').strip()[:32]
+        day = request.args.get('day', '')
+        if day:
+            from datetime import date
+            try:
+                date.fromisoformat(day)
+            except ValueError:
+                abort(400, '日期格式不正确')
+        logs = query('SELECT o.*,u.Username FROM OperationLogs o JOIN Users u ON u.Uid=o.Uid '
+                     'WHERE (%s="" OR u.Username LIKE %s) AND (%s="" OR DATE(o.OccurredAt)=%s) ORDER BY Opid DESC LIMIT 100',
+                     (keyword, '%' + keyword + '%', day, day or '2000-01-01'))
+        scores = query('SELECT s.*,u.Username FROM ScoreLogs s JOIN Users u ON u.Uid=s.Uid '
+                       'WHERE (%s="" OR u.Username LIKE %s) AND (%s="" OR DATE(s.OccurredAt)=%s) ORDER BY LogId DESC LIMIT 100',
+                       (keyword, '%' + keyword + '%', day, day or '2000-01-01'))
+        return render_template('logs.html', logs=logs, scores=scores)
     return app
 
 
