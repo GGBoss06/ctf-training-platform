@@ -1,93 +1,97 @@
-# CTF 训练竞赛平台（CTF Training Platform）
+# CTF 训练竞赛平台
 
-《互联网应用服务开发与数据库实践》课程大作业
-题目：**CTF训练竞赛平台的设计与实现**
+《互联网应用服务开发与数据库实践》课程设计。Flask + MySQL，实现学生训练与后台管理。报告学生信息沿用原始初稿：241240075 闫博泉，24034202 班。
 
-## 项目简介
+## 已实现功能
 
-平台面向高校 CTF 队伍的日常训练与校内选拔场景，服务参赛学生（student）与训练管理员（admin）两类角色。
-学生注册登录后可分类检索题目、查看详情并提交 flag，系统调用数据库存储过程在同一事务内完成查重、比对与计分，
-即时返回判定结果与得分；个人中心可查看答题记录与得分明细；总分榜与分类榜实时展示训练排名。
-管理员负责录题与上架，题目上架后进入公共题库。关键操作（注册、题目状态变更、积分变动）由触发器自动留痕。
+- 注册、登录、退出、邮箱与密码修改。
+- 分类、难度、关键词组合检索；题面查看与 flag 判定。
+- 个人提交记录、得分明细、总分榜及分类榜。
+- 管理员录题、修改、草稿删除、上架、下线、学生账号启停、日志筛选。
+- 7 张表、5 个视图、5 个存储过程、3 个触发器。
+- CSRF、服务端角色与账号状态检查、参数化 SQL、页面输出转义。
 
-数据库层是本项目的实现重点：7 张基本表、5 个视图、5 个存储过程、3 个触发器，全部脚本可在 MySQL 8.0+ 上一次性初始化并自动验证。
+演示包包含题面和演示 flag，不包含原始漏洞练习附件；附件字段仅记录标识，页面不提供失效下载按钮。
+数据库保留课程已有的 SHA-256 加盐口令设计；正式系统应迁移到专门的口令哈希算法，并增加限流与部署加固。
 
-## 仓库地址
+## 本机运行
 
-<https://github.com/GGBoss06/ctf-training-platform>
-
-```bash
-git clone https://github.com/GGBoss06/ctf-training-platform.git
-```
-
-## 目录结构
-
-```
-ctf-training-platform/
-├── README.md                 项目说明（本文件）
-├── .gitignore                忽略规则
-├── docs/                                 文档与验证证据
-│   ├── 系统设计文档_初稿.docx            大作业报告初稿（课程模板一至八章）
-│   ├── CTF训练竞赛平台数据库实现说明.docx 数据库实现说明
-│   ├── db_verification.json              数据库自动化验证结果（29 项）
-│   └── figures/                          插图和版本控制记录截图
-├── database/                             数据库脚本
-│   ├── README.md                         脚本说明
-│   └── ctf_init.sql                      建库建表 + 视图 + 存储过程 + 触发器 + 演示数据
-├── scripts/                              工具脚本
-│   ├── verify_db.py                      数据库自动化验证
-│   ├── build_report.py                   数据库实现说明生成
-│   ├── build_design_doc.py               系统设计文档生成
-│   ├── build_figures.py                  功能模块图与 E-R 图生成
-│   └── render_screenshot.py              版本控制记录截图生成
-├── src/                      源代码
-│   └── web/                  应用层（ASP.NET Web Forms，规划中）
-└── tests/                    测试说明与用例
-```
-
-## 技术栈与环境
-
-| 项目 | 说明 |
-|---|---|
-| 数据库 | MySQL 8.0+（字符集 utf8mb4，存储引擎 InnoDB） |
-| 验证脚本 | Python 3.10+、PyMySQL |
-| 报告生成 | Python 3.10+、python-docx |
-| 应用层 | B/S 架构，前端与服务端见 `src/web`（规划中） |
-
-## 快速开始
+需要 Python 3.11 或 3.12、MySQL 8.0.16 以上（推荐 8.4）。以下命令在项目目录执行。
 
 ```bash
-# 1. 初始化数据库（需先启动 MySQL 实例）
-mysql -h 127.0.0.1 -P 3306 -u root -p < database/ctf_init.sql
-
-# 2. 运行数据库自动化验证（会自动重建 ctf 库并导入脚本）
-#    网络连接默认 127.0.0.1:3306，可用 CTF_DB_* 环境变量覆盖
-python3 scripts/verify_db.py
-#    或走 socket：CTF_DB_SOCK=/path/to/mysql.sock python3 scripts/verify_db.py
-
-# 3. 重新生成报告（可选）
-python3 scripts/build_report.py
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+mysql -h 127.0.0.1 -u root -p < database/ctf_init.sql
 ```
 
-演示账号：管理员 `admin / Admin@123`；学生 `zhangsan / Pass@123` 等。
+初始化脚本用于全新数据库。随后以管理员登录 MySQL，单独创建应用账号：
 
-## 提交规范
-
-提交信息遵循 Conventional Commits：`<类型>(<范围>): <简述>`，类型取
-`feat` / `fix` / `docs` / `style` / `refactor` / `test` / `build` / `chore`。
-
-示例：
-
-```
-chore: 初始化项目仓库与标准目录结构
-feat(database): 添加数据库初始化脚本
-test(database): 添加数据库自动化验证
-docs: 提交大作业报告初稿
+```sql
+CREATE USER 'ctf_app'@'localhost' IDENTIFIED BY '自行设置数据库密码';
+GRANT SELECT,INSERT,UPDATE,DELETE,EXECUTE ON ctf.* TO 'ctf_app'@'localhost';
 ```
 
-## 作者信息
+复制 `.env.example` 为 `.env`，填写数据库密码，把 `CTF_SECRET_KEY` 改成随机字符串。`.env` 已被 Git 忽略。
 
-- 班级：24034202
-- 学号：241240075
-- 姓名：闫博泉
-- 教师：邢艳
+```bash
+cp .env.example .env
+# 使用编辑器填写 .env，完成后执行：
+set -a
+source .env
+set +a
+python src/web/app.py
+```
+
+打开 http://127.0.0.1:5000 。管理员 `admin / Admin@123`；学生 `zhangsan / Pass@123`。未解题学生 `xuer / Pass@123` 可验证首次得分。
+演示题 Welcome Pwn 的 flag 为 `flag{w3lc0me_pwn}`；SQL 注入初探为 `flag{sql_1nj3ct10n}`。这些均为公开测试数据。
+
+## 数据库恢复
+
+- `database/ctf_init.sql`：结构、视图、过程、触发器及初始数据。
+- `database/ctf_backup.sql`：由 MySQL 8.4.7 的 mysqldump 实际导出，含 routines、triggers、events 和初始数据。
+
+```bash
+mysql -h 127.0.0.1 -u root -p < database/ctf_backup.sql
+```
+
+备份含 DEFINER 信息，建议由有创建存储过程和触发器权限的本机数据库管理员导入。
+
+## 验证
+
+`docs/db_verification.json` 为 29 项数据库验证结果；`docs/web_verification.json` 为 6 组应用集成测试结果。数据库验证会重建 `ctf` 库，集成测试会写入账号和记录；只连接专用演示库。
+
+```bash
+export CTF_DB_USER=root
+export CTF_DB_PASSWORD='本机测试数据库密码'
+python scripts/verify_db.py
+CTF_RUN_INTEGRATION=1 python -m unittest discover -s tests -v
+```
+
+Windows PowerShell 可使用 `$env:CTF_DB_USER='root'` 等设置同名环境变量。
+
+## 目录
+
+- `src/web/`：应用全部源码。
+- `database/`：初始化和导出 SQL。
+- `docs/`：报告、验证结果与真实运行截图。
+- `scripts/`：验证和文档生成工具。
+- `tests/`：业务、权限及并发集成测试。
+
+旧初稿和旧生成脚本保留作历史材料，验收以最终报告为准。
+
+## GitHub Desktop 同步
+
+远程仓库：https://github.com/GGBoss06/ctf-training-platform
+
+交付项目保留 `.git` 目录。新增提交对应实际代码、测试和报告改动，原始历史未改写，未回填日期。
+
+1. 解压交付包，打开 GitHub Desktop。
+2. 选择 **File → Add Local Repository**，定位 `02_程序源代码/ctf-training-platform`。
+3. 确认仓库为 `GGBoss06/ctf-training-platform`、分支为 `main`。
+4. 点击 **Push origin**，等待完成。在 GitHub 网页核对提交总数至少 20。
+5. 若远程已有新提交，先保留双方材料并处理合并，不要强制推送。
+
+## 电子签
+
+Word 与 PDF 采用同一报告。电子签栏需本人签署；在 Word 插入本人签名后，重新导出 PDF，再通过 GitHub Desktop 提交并推送两份报告。

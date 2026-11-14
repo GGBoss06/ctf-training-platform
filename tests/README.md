@@ -1,16 +1,11 @@
-# 测试
+# 集成测试
 
-数据库层的自动化验证位于 `scripts/verify_db.py`，覆盖 29 项断言：
+使用真正的 MySQL，覆盖页面、检索、CSRF、权限、注册、资料修改、题目增删改查、上下架、判题、重复提交、并发计分和账号停用。
 
-- 初始数据规模与对象数量
-- 视图输出列与排行榜数据一致性
-- 存储过程正常与异常路径（注册、录题、上架、flag 判定、个人记录）
-- 触发器自动留痕与积分累计一致性
-- 主键、唯一、外键、CHECK 约束的拒绝行为
-- 事务回滚无残留
+先将初始化 SQL 导入专用演示库，配置连接变量，再执行：
 
 ```bash
-python3 scripts/verify_db.py
+CTF_RUN_INTEGRATION=1 python -m unittest discover -s tests -v
 ```
 
-结果写入 `docs/db_verification.json`。
+测试会写入数据。未设置开关时跳过。结果见 docs/web_verification.json。

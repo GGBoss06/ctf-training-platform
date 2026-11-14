@@ -15,7 +15,7 @@ from PIL import Image
 FIG_DIR = Path(__file__).resolve().parent.parent / 'docs' / 'figures'
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
-FONT_PATH = '/System/Library/Fonts/Supplemental/Songti.ttc'
+FONT_PATH = next(str(p) for p in [Path('/System/Library/Fonts/Supplemental/Songti.ttc'), Path('/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc')] if p.exists())
 
 
 def fp(size):
@@ -72,7 +72,7 @@ def module_figure():
                 seg(ax, [(cx, y + 3.75 + 8.25), (cx, y + 3.75)])
 
     # 后台：两列各两项 + 中间一项
-    back = [(43, ['题目管理', '公告管理']), (57, ['分类管理', '用户管理'])]
+    back = [(43, ['题目维护', '上下架管理']), (57, ['用户管理', '账号状态'])]
     for cx, names in back:
         for i, name in enumerate(names):
             y = 55.75 - i * 12

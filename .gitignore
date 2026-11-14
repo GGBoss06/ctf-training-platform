@@ -25,3 +25,6 @@ mysql-data/
 # Office 临时文件
 ~$*.doc
 ~$*.docx
+
+.env
+rendered/
