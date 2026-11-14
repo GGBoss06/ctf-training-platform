@@ -282,7 +282,7 @@ proc: BEGIN
 
     SET p_chid = 0, p_result = 'error', p_message = '录题未完成';
 
-    SELECT Role INTO v_role FROM Users WHERE Uid = p_admin;
+    SELECT Role INTO v_role FROM Users WHERE Uid = p_admin AND Status='active';
     IF v_role IS NULL OR v_role <> 'admin' THEN
         SET p_result = 'denied', p_message = '该操作需要管理员权限';
         LEAVE proc;
@@ -335,7 +335,7 @@ proc: BEGIN
 
     SET p_result = 'error', p_message = '上架未完成';
 
-    SELECT Role INTO v_role FROM Users WHERE Uid = p_admin;
+    SELECT Role INTO v_role FROM Users WHERE Uid = p_admin AND Status='active';
     IF v_role IS NULL OR v_role <> 'admin' THEN
         SET p_result = 'denied', p_message = '该操作需要管理员权限';
         LEAVE proc;
@@ -389,37 +389,42 @@ proc: BEGIN
 
     SET p_result = 'error', p_score = 0, p_message = '判定未完成';
 
-    SELECT Status INTO v_user_status FROM Users WHERE Uid = p_uid;
+    -- 同一账号的提交串行化，防止跨题并发时积分日志累计值不一致。
+    START TRANSACTION;
+    SELECT Status INTO v_user_status FROM Users WHERE Uid = p_uid FOR UPDATE;
     IF v_user_status IS NULL THEN
         SET p_message = '用户不存在';
+        ROLLBACK;
         LEAVE proc;
     ELSEIF v_user_status <> 'active' THEN
         SET p_message = '账号已停用，无法提交';
+        ROLLBACK;
         LEAVE proc;
     END IF;
 
     SELECT Status, Score, FlagSalt, FlagHash
     INTO v_ch_status, v_ch_score, v_salt, v_target
     FROM Challenges
-    WHERE Chid = p_chid;
+    WHERE Chid = p_chid FOR SHARE;
     IF v_ch_status IS NULL THEN
         SET p_message = '题目不存在';
+        ROLLBACK;
         LEAVE proc;
     ELSEIF v_ch_status <> 'online' THEN
         SET p_message = '题目未上架，暂不可提交';
+        ROLLBACK;
         LEAVE proc;
     END IF;
 
     SET v_flaghash = SHA2(CONCAT(p_flag, v_salt), 256);
-
-    START TRANSACTION;
+    SET v_correct = (v_flaghash = v_target);
     SELECT COUNT(*) INTO v_solved FROM Solves WHERE Uid = p_uid AND Chid = p_chid;
     IF v_solved > 0 THEN
         INSERT INTO Submissions (Uid, Chid, FlagHash, IsCorrect)
-        VALUES (p_uid, p_chid, v_flaghash, 1);
+        VALUES (p_uid, p_chid, v_flaghash, v_correct);
         COMMIT;
-        SET p_result = 'duplicate', p_score = 0,
-            p_message = '该题已解出，本次提交不重复计分';
+        SET p_result = IF(v_correct=1, 'duplicate', 'wrong'), p_score = 0,
+            p_message = IF(v_correct=1, '该题已解出，本次提交不重复计分', 'flag 不正确，该笔提交不计分');
         LEAVE proc;
     END IF;
 

@@ -33,7 +33,7 @@ def create_app(test_config=None):
                 g.user = None
         if request.method == 'POST':
             token = request.form.get('csrf_token', '')
-            if not token or not hmac.compare_digest(token, session.get('csrf_token', '')):
+            if not token or not hmac.compare_digest(token.encode(), session.get('csrf_token', '').encode()):
                 abort(400, '表单已失效，请刷新后重试')
 
     def csrf_token():
