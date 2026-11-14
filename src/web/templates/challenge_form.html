@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% block title %}{{ '修改题目' if item else '录入题目' }}{% endblock %}{% block content %}
+<a href="/admin/challenges">← 题目管理</a><h1>{{ '修改题目' if item else '录入新题' }}</h1><p class="muted">新题以草稿保存，上架后进入公共题库。已有提交的题目仅允许调整题面、难度及附件标识。</p>
+<form method="post" class="panel"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>题目名称<input name="title" maxlength="64" value="{{ item.Title if item else '' }}" required></label>
+<div class="toolbar"><label>分类<select name="cid">{% for c in categories %}<option value="{{ c.Cid }}" {% if item and item.Cid == c.Cid %}selected{% endif %}>{{ c.Cname }}</option>{% endfor %}</select></label>
+<label>分值<input type="number" name="score" min="1" max="100000" value="{{ item.Score if item else 100 }}" required></label><label>难度 <output id="difficulty-value">{{ item.Difficulty if item else 1 }}</output><input type="range" name="difficulty" min="1" max="5" value="{{ item.Difficulty if item else 1 }}" data-output="difficulty-value"></label></div>
+<label>题目描述<textarea name="description" maxlength="500">{{ item.Description or '' if item else '' }}</textarea></label><label>Flag{{ '（留空则不修改）' if item else '' }}<input type="password" name="flag" minlength="6" maxlength="128" autocomplete="new-password" {% if not item %}required{% endif %}></label>
+<label>附件标识<input name="attachment" maxlength="128" value="{{ item.Attachment or '' if item else '' }}" placeholder="可留空，仅记录标识"></label><button>保存{{ '修改' if item else '草稿' }}</button></form>{% endblock %}
