@@ -147,7 +147,49 @@ def create_app(test_config=None):
         return render_template('profile.html', records=records, scores=scores,
                                total=sum(x['得分'] for x in scores))
 
-    # 训练与管理路由。
+    @app.get('/challenges')
+    def challenges():
+        category = request.args.get('category', '').strip()
+        difficulty = request.args.get('difficulty', '')
+        keyword = request.args.get('q', '').strip()[:64]
+        if difficulty and difficulty not in {'1', '2', '3', '4', '5'}:
+            abort(400, '难度取值应为 1 至 5')
+        rows = query('SELECT * FROM v_challenge_public WHERE (%s="" OR 分类=%s) '
+                     'AND (%s="" OR 难度=%s) AND (%s="" OR 题名 LIKE %s) ORDER BY 题目编号',
+                     (category, category, difficulty, difficulty or 0, keyword, '%' + keyword + '%'))
+        return render_template('challenges.html', rows=rows,
+                               categories=query('SELECT * FROM Categories ORDER BY Cid'))
+
+    @app.route('/challenges/<int:chid>', methods=['GET', 'POST'])
+    def detail(chid):
+        item = query('SELECT * FROM v_challenge_public WHERE 题目编号=%s', (chid,), one=True)
+        if not item:
+            abort(404, '该题目不存在或尚未上架')
+        if request.method == 'POST':
+            if not g.user:
+                return redirect(url_for('login'))
+            flag = request.form.get('flag', '').strip()
+            if not 6 <= len(flag) <= 128:
+                flash('flag 长度应为 6 至 128 位。', 'error')
+            else:
+                result = call('sp_submit_flag', (g.user['Uid'], chid, flag), ('result', 'score', 'message'))
+                flash(result['message'], 'success' if result['result'] in {'correct', 'duplicate'} else 'error')
+            return redirect(url_for('detail', chid=chid))
+        solved = g.user and query('SELECT 1 FROM Solves WHERE Uid=%s AND Chid=%s',
+                                  (g.user['Uid'], chid), one=True)
+        return render_template('detail.html', item=item, solved=solved)
+
+    @app.get('/ranking')
+    def ranking():
+        category = request.args.get('category', '').strip()
+        if category:
+            rows = query('SELECT 名次,用户名,分类得分 AS 总分,解题数 FROM v_category_rank WHERE 分类=%s ORDER BY 名次,用户名', (category,))
+        else:
+            rows = query('SELECT * FROM v_total_rank ORDER BY 名次,用户名')
+        return render_template('ranking.html', rows=rows,
+                               categories=query('SELECT * FROM Categories ORDER BY Cid'))
+
+    # 管理员路由。
     return app
 
 

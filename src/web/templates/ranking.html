@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% block title %}排行榜{% endblock %}{% block content %}
+<div class="eyebrow">TRAINING LEADERBOARD</div><h1>每一分都有记录</h1><p class="lead">仅累计首次解出的分值。同分时，较早达到该成绩的用户排在前面。</p>
+<form class="panel toolbar"><label>榜单范围<select name="category"><option value="">总分排行榜</option>{% for c in categories %}<option {% if request.args.get('category') == c.Cname %}selected{% endif %}>{{ c.Cname }}</option>{% endfor %}</select></label><button>查看榜单</button></form>
+<section class="panel"><div class="table-wrap"><table><thead><tr><th>名次</th><th>用户名</th><th>总分</th><th>解题数</th></tr></thead><tbody>{% for r in rows %}<tr><td>{{ r.名次 }}</td><td>{{ r.用户名 }}</td><td><strong>{{ r.总分 }}</strong></td><td>{{ r.解题数 }}</td></tr>{% else %}<tr><td colspan="4">暂无解题记录</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
