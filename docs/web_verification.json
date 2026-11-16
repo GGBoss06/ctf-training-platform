@@ -1,6 +1,6 @@
 {
-  "mysql_version": "8.4.7",
-  "tests": 6,
+  "mysql_version": "26.7.0",
+  "tests": 7,
   "passed": true,
   "failures": [],
   "errors": []
