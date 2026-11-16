@@ -320,8 +320,82 @@ def create_app(test_config=None):
             flash('学生账号状态已更新。' if changed else '未更新，管理员账号受保护。', 'success' if changed else 'error')
             return redirect(url_for('admin_users'))
         keyword = request.args.get('q', '').strip()[:32]
-        users = query('SELECT Uid,Username,Email,Role,Status FROM Users WHERE Username LIKE %s ORDER BY Uid', ('%' + keyword + '%',))
+        users = query('SELECT u.Uid,u.Username,u.Email,u.Role,u.Status,'
+                      '(SELECT COUNT(*) FROM Submissions s WHERE s.Uid=u.Uid) AS SubmissionCount,'
+                      '(SELECT COUNT(*) FROM Solves so WHERE so.Uid=u.Uid) AS SolveCount,'
+                      '(SELECT COALESCE(SUM(so.ScoreAwarded),0) FROM Solves so WHERE so.Uid=u.Uid) AS TotalScore '
+                      'FROM Users u WHERE u.Username LIKE %s ORDER BY u.Uid', ('%' + keyword + '%',))
         return render_template('users.html', users=users)
+
+    @app.route('/admin/users/<int:uid>/edit', methods=['GET', 'POST'])
+    @require_user(admin=True)
+    def admin_user_edit(uid):
+        target = query('SELECT Uid,Username,Email,Role,Status,CreatedAt FROM Users WHERE Uid=%s', (uid,), one=True)
+        if not target:
+            abort(404, '用户不存在')
+        if target['Role'] != 'student':
+            flash('管理员账号受保护，不能在用户管理中修改。', 'error')
+            return redirect(url_for('admin_users'))
+        if request.method == 'POST':
+            action = request.form.get('action')
+            if action == 'password':
+                password = request.form.get('password', '')
+                confirm = request.form.get('confirm_password', '')
+                if not 6 <= len(password) <= 64:
+                    flash('新密码长度应为 6 至 64 位。', 'error')
+                elif password != confirm:
+                    flash('两次输入的新密码不一致。', 'error')
+                else:
+                    salt = secrets.token_hex(16)
+                    digest = hashlib.sha256((password + salt).encode()).hexdigest()
+                    execute("UPDATE Users SET PasswordHash=%s,Salt=%s WHERE Uid=%s AND Role='student'", (digest, salt, uid))
+                    execute('INSERT INTO OperationLogs(Uid,Action,Target,Detail) VALUES(%s,%s,%s,%s)',
+                            (g.user['Uid'], '重置密码', target['Username'], '管理员重置学生登录口令'))
+                    flash('已重置 %s 的登录密码（口令哈希后入库，明文不保存）。' % target['Username'], 'success')
+                return redirect(url_for('admin_user_edit', uid=uid))
+            if action == 'delete':
+                db = connection()
+                db.begin()
+                try:
+                    locked = query("SELECT Uid,Username FROM Users WHERE Uid=%s AND Role='student' FOR UPDATE", (uid,), one=True)
+                    if not locked:
+                        abort(404, '用户不存在或受保护')
+                    submissions = query('SELECT COUNT(*) AS n FROM Submissions WHERE Uid=%s', (uid,), one=True)['n']
+                    solves = query('SELECT COUNT(*) AS n FROM Solves WHERE Uid=%s', (uid,), one=True)['n']
+                    # 外键要求先清理引用该账号的得分、解题、提交与操作日志，再删除账号本身。
+                    execute('DELETE FROM ScoreLogs WHERE Uid=%s', (uid,))
+                    execute('DELETE FROM Solves WHERE Uid=%s', (uid,))
+                    execute('DELETE FROM Submissions WHERE Uid=%s', (uid,))
+                    execute('DELETE FROM OperationLogs WHERE Uid=%s', (uid,))
+                    execute('DELETE FROM Users WHERE Uid=%s', (uid,))
+                    execute('INSERT INTO OperationLogs(Uid,Action,Target,Detail) VALUES(%s,%s,%s,%s)',
+                            (g.user['Uid'], '删除账号', locked['Username'],
+                             '删除学生账号，清理 %d 条提交、%d 条得分记录' % (submissions, solves)))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    raise
+                flash('账号 %s 及其提交记录已删除。' % locked['Username'], 'success')
+                return redirect(url_for('admin_users'))
+            email = request.form.get('email', '').strip()
+            status = request.form.get('status')
+            if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', email) or len(email) > 64:
+                flash('邮箱格式不正确。', 'error')
+            elif status not in {'active', 'disabled'}:
+                flash('账号状态无效。', 'error')
+            else:
+                execute("UPDATE Users SET Email=%s,Status=%s WHERE Uid=%s AND Role='student'", (email, status, uid))
+                execute('INSERT INTO OperationLogs(Uid,Action,Target,Detail) VALUES(%s,%s,%s,%s)',
+                        (g.user['Uid'], '修改账号', target['Username'], '更新学生邮箱或账号状态'))
+                flash('账号资料已更新。', 'success')
+            return redirect(url_for('admin_user_edit', uid=uid))
+        stats = dict(
+            submissions=query('SELECT COUNT(*) AS n FROM Submissions WHERE Uid=%s', (uid,), one=True)['n'],
+            solves=query('SELECT COUNT(*) AS n FROM Solves WHERE Uid=%s', (uid,), one=True)['n'],
+            score=query('SELECT COALESCE(SUM(ScoreAwarded),0) AS n FROM Solves WHERE Uid=%s', (uid,), one=True)['n'],
+            logs=query('SELECT COUNT(*) AS n FROM OperationLogs WHERE Uid=%s', (uid,), one=True)['n'])
+        records = query('SELECT * FROM v_submission_record WHERE 用户编号=%s ORDER BY 提交编号 DESC LIMIT 20', (uid,))
+        return render_template('admin_user_edit.html', target=target, stats=stats, records=records)
 
     @app.get('/admin/logs')
     @require_user(admin=True)
