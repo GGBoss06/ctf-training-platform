@@ -275,13 +275,20 @@ def create_app(test_config=None):
             item = query('SELECT Chid,Title,Status FROM Challenges WHERE Chid=%s FOR UPDATE', (chid,), one=True)
             if not item:
                 abort(404, '题目不存在')
+            submissions = solves = 0
             if action == 'delete':
-                if item['Status'] != 'draft' or query('SELECT 1 FROM Submissions WHERE Chid=%s LIMIT 1', (chid,), one=True):
-                    db.rollback()
-                    flash('仅能删除没有提交记录的草稿；已上架题目请下线。', 'error')
-                    return redirect(url_for('admin_challenges'))
+                # 管理员可删除任意状态的题目。外键在结构层阻止直接删除，
+                # 因此先按依赖顺序清理该题目的得分、解题与提交记录，再删题目本身。
+                submissions = query('SELECT COUNT(*) AS n FROM Submissions WHERE Chid=%s', (chid,), one=True)['n']
+                solves = query('SELECT COUNT(*) AS n FROM Solves WHERE Chid=%s', (chid,), one=True)['n']
+                execute('DELETE FROM ScoreLogs WHERE Chid=%s', (chid,))
+                execute('DELETE FROM Solves WHERE Chid=%s', (chid,))
+                execute('DELETE FROM Submissions WHERE Chid=%s', (chid,))
                 execute('DELETE FROM Challenges WHERE Chid=%s', (chid,))
-                execute('INSERT INTO OperationLogs(Uid,Action,Target,Detail) VALUES(%s,%s,%s,%s)', (g.user['Uid'], '删除草稿', item['Title'], '删除未产生提交的草稿'))
+                detail = '删除%s题目，清理 %d 条提交、%d 条得分记录' % (
+                    {'draft': '草稿', 'online': '上架', 'offline': '下线'}.get(item['Status'], ''), submissions, solves)
+                execute('INSERT INTO OperationLogs(Uid,Action,Target,Detail) VALUES(%s,%s,%s,%s)',
+                        (g.user['Uid'], '删除题目', item['Title'], detail))
             else:
                 execute('SET @operator_uid=%s', (g.user['Uid'],))
                 execute("UPDATE Challenges SET Status='offline' WHERE Chid=%s", (chid,))
@@ -289,7 +296,13 @@ def create_app(test_config=None):
         except Exception:
             db.rollback()
             raise
-        flash('草稿已删除。' if action == 'delete' else '题目已下线。', 'success')
+        if action == 'delete':
+            if submissions or solves:
+                flash('题目已删除，同时清理了 %d 条提交记录和 %d 条得分记录。' % (submissions, solves), 'success')
+            else:
+                flash('题目已删除。', 'success')
+        else:
+            flash('题目已下线。', 'success')
         return redirect(url_for('admin_challenges'))
 
     @app.route('/admin/users', methods=['GET', 'POST'])
