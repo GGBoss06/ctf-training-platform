@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% block title %}管理账号{% endblock %}{% block content %}
+<a href="/admin/users">← 用户管理</a><div class="eyebrow">ACCOUNT MANAGEMENT</div><h1>{{ target.Username }}</h1><p class="muted">角色：{{ target.Role }} · 注册时间：{{ target.CreatedAt }} · 编号：{{ target.Uid }}</p>
+<div class="two-col"><section class="panel"><h2>账号资料</h2><p>提交 {{ stats.submissions }} 次 · 解出 {{ stats.solves }} 题 · 总分 {{ stats.score }} · 操作日志 {{ stats.logs }} 条</p>
+<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="profile">
+<label>电子邮箱<input type="email" name="email" value="{{ target.Email }}" maxlength="64" required></label>
+<label>账号状态<select name="status"><option value="active" {% if target.Status == 'active' %}selected{% endif %}>正常</option><option value="disabled" {% if target.Status == 'disabled' %}selected{% endif %}>停用</option></select></label>
+<div class="actions"><button>保存资料</button></div></form></section>
+<section class="panel"><h2>重置登录密码</h2><p class="muted">直接为学生设置新密码，输入后以加盐 SHA-256 摘要入库，明文不保存；重置后学生需用新密码登录。</p>
+<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="password">
+<label>新密码<input type="password" name="password" minlength="6" maxlength="64" autocomplete="new-password" required></label>
+<label>确认新密码<input type="password" name="confirm_password" minlength="6" maxlength="64" autocomplete="new-password" required></label>
+<div class="actions"><button>重置密码</button></div></form></section></div>
+<section class="panel"><h2 class="danger-text">删除账号</h2><p>删除后该学生的 {{ stats.submissions }} 条提交、{{ stats.solves }} 条得分记录与操作日志会一并清除，排行榜随之更新，且无法恢复。管理员账号受保护，不能在此删除。</p>
+<form method="post" data-confirm="确认删除账号 {{ target.Username }}？其提交与得分记录将一并清除，且无法恢复。"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="delete"><button class="danger">删除该账号</button></form></section>
+<section class="panel"><h2>最近 20 次提交</h2><div class="table-wrap"><table><thead><tr><th>题目</th><th>分类</th><th>判定</th><th>本次得分</th><th>时间</th></tr></thead><tbody>{% for r in records %}<tr><td>{{ r.题名 }}</td><td>{{ r.分类 }}</td><td>{{ '正确' if r.是否答对 else '错误' }}</td><td>{{ r.本次得分 }}</td><td>{{ r.提交时间 }}</td></tr>{% else %}<tr><td colspan="5">暂无提交</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
