@@ -29,6 +29,12 @@ class WebIntegrationTests(unittest.TestCase):
             token = sess['csrf_token']
         return self.client.post(path, data={'csrf_token': token, **(values or {})}, follow_redirects=True)
 
+    def client_post(self, client, path, values=None):
+        client.get('/login')
+        with client.session_transaction() as sess:
+            token = sess['csrf_token']
+        return client.post(path, data={'csrf_token': token, **(values or {})}, follow_redirects=True)
+
     def login(self, username='admin', password='Admin@123'):
         response = self.post('/login', {'username': username, 'password': password})
         self.assertEqual(response.status_code, 200)
@@ -74,14 +80,36 @@ class WebIntegrationTests(unittest.TestCase):
             chid = query('SELECT Chid FROM Challenges WHERE Title=%s', (values['title'],), one=True)['Chid']
         values.update(title='集成测试修改', score='150', flag='')
         self.assertIn('已更新', self.post(f'/admin/challenges/{chid}/edit', values).get_data(as_text=True))
-        self.assertIn('草稿已删除', self.post(f'/admin/challenges/{chid}/delete').get_data(as_text=True))
-        self.assertIn('仅能删除', self.post('/admin/challenges/1/delete').get_data(as_text=True))
+        self.assertIn('题目已删除', self.post(f'/admin/challenges/{chid}/delete').get_data(as_text=True))
+        self.assertIn('删除题目', self.client.get('/admin/logs').get_data(as_text=True))
+        # 上架后仍可删除：不再要求题目必须是草稿
+        values = {'cid': '4', 'title': '集成测试上架后删除', 'description': '上线后删除', 'difficulty': '2', 'score': '222', 'flag': 'flag{publish_then_delete}', 'attachment': ''}
+        self.post('/admin/challenges/new', values)
+        with self.app.app_context():
+            chid = query('SELECT Chid FROM Challenges WHERE Title=%s', (values['title'],), one=True)['Chid']
+        self.assertIn('已上架', self.post(f'/admin/challenges/{chid}/publish').get_data(as_text=True))
+        self.assertEqual(self.client.get(f'/challenges/{chid}').status_code, 200)
+        # 已产生提交、解题与得分日志后删除，相关记录应被一并清理
+        student = self.app.test_client()
+        self.client_post(student, '/login', {'username': 'zhangsan', 'password': 'Pass@123'})
+        self.client_post(student, f'/challenges/{chid}', {'flag': 'flag{publish_then_delete}'})
+        with self.app.app_context():
+            self.assertEqual(query('SELECT COUNT(*) AS n FROM Submissions WHERE Chid=%s', (chid,), one=True)['n'], 1)
+            self.assertEqual(query('SELECT COUNT(*) AS n FROM Solves WHERE Chid=%s', (chid,), one=True)['n'], 1)
+            self.assertEqual(query('SELECT COUNT(*) AS n FROM ScoreLogs WHERE Chid=%s', (chid,), one=True)['n'], 1)
+        deleted = self.post(f'/admin/challenges/{chid}/delete').get_data(as_text=True)
+        self.assertIn('题目已删除', deleted)
+        self.assertIn('清理了 1 条提交记录和 1 条得分记录', deleted)
+        with self.app.app_context():
+            self.assertIsNone(query('SELECT Chid FROM Challenges WHERE Chid=%s', (chid,), one=True))
+            self.assertEqual(query('SELECT COUNT(*) AS n FROM Submissions WHERE Chid=%s', (chid,), one=True)['n'], 0)
+            self.assertEqual(query('SELECT COUNT(*) AS n FROM Solves WHERE Chid=%s', (chid,), one=True)['n'], 0)
+            self.assertEqual(query('SELECT COUNT(*) AS n FROM ScoreLogs WHERE Chid=%s', (chid,), one=True)['n'], 0)
         self.assertIn('已上架', self.post('/admin/challenges/14/publish').get_data(as_text=True))
         page = self.client.get('/challenges/14')
         self.assertEqual(page.status_code, 200)
         self.assertIn('已下线', self.post('/admin/challenges/14/offline').get_data(as_text=True))
         self.assertEqual(self.client.get('/challenges/14').status_code, 404)
-        self.assertIn('删除草稿', self.client.get('/admin/logs').get_data(as_text=True))
 
     def test_04_judging_and_duplicate(self):
         self.login('xuer', 'Pass@123')
@@ -129,6 +157,44 @@ class WebIntegrationTests(unittest.TestCase):
         self.post('/login', {'username': 'xuer', 'password': 'Pass@123'})
         with self.client.session_transaction() as sess:
             self.assertNotIn('uid', sess)
+
+
+    def test_07_admin_user_management(self):
+        self.login()
+        register = self.app.test_client()
+        self.client_post(register, '/register', {'username': 'manage_user', 'password': 'Test@123', 'email': 'manage@example.com'})
+        with self.app.app_context():
+            user = query('SELECT Uid FROM Users WHERE Username=%s', ('manage_user',), one=True)
+        self.assertIsNotNone(user)
+        uid = user['Uid']
+        page = self.client.get(f'/admin/users/{uid}/edit')
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('manage_user', page.get_data(as_text=True))
+        self.assertIn('重置登录密码', page.get_data(as_text=True))
+        self.assertIn('账号资料已更新', self.post(f'/admin/users/{uid}/edit', {'action': 'profile', 'email': 'managed@example.com', 'status': 'disabled'}).get_data(as_text=True))
+        with self.app.app_context():
+            updated = query('SELECT Email,Status FROM Users WHERE Uid=%s', (uid,), one=True)
+            self.assertEqual(updated['Email'], 'managed@example.com')
+            self.assertEqual(updated['Status'], 'disabled')
+        self.assertIn('两次输入的新密码不一致', self.post(f'/admin/users/{uid}/edit', {'action': 'password', 'password': 'NewPass@123', 'confirm_password': 'Other@1234'}).get_data(as_text=True))
+        self.assertIn('已重置 manage_user 的登录密码', self.post(f'/admin/users/{uid}/edit', {'action': 'password', 'password': 'NewPass@123', 'confirm_password': 'NewPass@123'}).get_data(as_text=True))
+        # 重置后学生可用新密码登录（账号当时为停用态，先启用）
+        self.post('/admin/users', {'uid': uid, 'status': 'active'})
+        student = self.app.test_client()
+        self.client_post(student, '/login', {'username': 'manage_user', 'password': 'NewPass@123'})
+        with student.session_transaction() as sess:
+            self.assertIn('uid', sess)
+        # 有提交与得分记录的账号也能删除，相关记录随账号清理
+        with self.app.app_context():
+            call('sp_submit_flag', (uid, 1, 'flag{w3lc0me_pwn}'), ('result', 'score', 'message'))
+        self.assertIn('已删除', self.post(f'/admin/users/{uid}/edit', {'action': 'delete'}).get_data(as_text=True))
+        with self.app.app_context():
+            self.assertIsNone(query('SELECT Uid FROM Users WHERE Uid=%s', (uid,), one=True))
+            for table in ('Submissions', 'Solves', 'ScoreLogs', 'OperationLogs'):
+                self.assertEqual(query(f'SELECT COUNT(*) AS n FROM {table} WHERE Uid=%s', (uid,), one=True)['n'], 0)
+        # 管理员账号受保护，不能从用户管理里修改或删除
+        self.assertEqual(self.client.get('/admin/users/1/edit').status_code, 302)
+        self.assertIn('管理员账号受保护', self.post('/admin/users/1/edit', {'action': 'delete'}).get_data(as_text=True))
 
 
 if __name__ == '__main__':
