@@ -18,7 +18,7 @@
 7. 打开 GitHub 网页核对提交总数至少 20，并确认有最终代码、Word 和 PDF。
 8. 若提示远程已有新提交，不要 Force push；保留两份项目后合并处理。
 
-远程 main 已推送到与本地一致（共 26 次提交），后续签名等新改动仍可在 GitHub Desktop 点击 Push origin。
+远程 main 已与本地同步（GitHub Desktop 可查看，无需再次推送），后续签名等新改动仍可在 GitHub Desktop 点击 Push origin。
 外层 04_版本控制记录.txt 记录本地完整提交历史。
 
 三、压缩上传
